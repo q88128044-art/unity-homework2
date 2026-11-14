@@ -1,65 +1,42 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-// Simple first-person movement (new Input System): WASD + mouse.
+// Рух гравця: WASD / стрілки.
 [RequireComponent(typeof(CharacterController))]
 public class PlayerController : MonoBehaviour
 {
-    [SerializeField] private float moveSpeed = 4f;
-    [SerializeField] private float mouseSensitivity = 0.1f;
-    [SerializeField] private Transform cameraTransform;
+    [SerializeField] private float speed = 6f;
+    [SerializeField] private float gravity = -20f;
 
     private CharacterController controller;
-    private float pitch;
     private float verticalVelocity;
 
     private void Awake()
     {
         controller = GetComponent<CharacterController>();
-        if (cameraTransform == null)
-        {
-            Camera childCamera = GetComponentInChildren<Camera>();
-            if (childCamera != null) cameraTransform = childCamera.transform;
-        }
-    }
-
-    private void Start()
-    {
-        SetCursorLocked(true);
     }
 
     private void Update()
     {
-        Keyboard kb = Keyboard.current;
-        Mouse mouse = Mouse.current;
-        if (kb == null) return;
-
-        if (kb.escapeKey.wasPressedThisFrame) SetCursorLocked(false);
-        if (mouse != null && mouse.leftButton.wasPressedThisFrame) SetCursorLocked(true);
-
-        if (mouse != null && Cursor.lockState == CursorLockMode.Locked)
+        Vector2 input = Vector2.zero;
+        var kb = Keyboard.current;
+        if (kb != null)
         {
-            Vector2 delta = mouse.delta.ReadValue() * mouseSensitivity;
-            transform.Rotate(0f, delta.x, 0f);
-            pitch = Mathf.Clamp(pitch - delta.y, -80f, 80f);
-            if (cameraTransform != null) cameraTransform.localEulerAngles = new Vector3(pitch, 0f, 0f);
+            if (kb.wKey.isPressed || kb.upArrowKey.isPressed) input.y += 1f;
+            if (kb.sKey.isPressed || kb.downArrowKey.isPressed) input.y -= 1f;
+            if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) input.x += 1f;
+            if (kb.aKey.isPressed || kb.leftArrowKey.isPressed) input.x -= 1f;
         }
 
-        Vector2 input = Vector2.zero;
-        if (kb.wKey.isPressed) input.y += 1f;
-        if (kb.sKey.isPressed) input.y -= 1f;
-        if (kb.dKey.isPressed) input.x += 1f;
-        if (kb.aKey.isPressed) input.x -= 1f;
+        Vector3 move = new Vector3(input.x, 0f, input.y);
+        if (move.sqrMagnitude > 1f) move.Normalize();
 
-        Vector3 move = (transform.right * input.x + transform.forward * input.y).normalized * moveSpeed;
-        verticalVelocity = controller.isGrounded ? -1f : verticalVelocity + Physics.gravity.y * Time.deltaTime;
-        move.y = verticalVelocity;
-        controller.Move(move * Time.deltaTime);
-    }
+        if (controller.isGrounded && verticalVelocity < 0f) verticalVelocity = -2f;
+        verticalVelocity += gravity * Time.deltaTime;
 
-    private static void SetCursorLocked(bool locked)
-    {
-        Cursor.lockState = locked ? CursorLockMode.Locked : CursorLockMode.None;
-        Cursor.visible = !locked;
+        controller.Move((move * speed + Vector3.up * verticalVelocity) * Time.deltaTime);
+
+        if (move.sqrMagnitude > 0.01f)
+            transform.forward = Vector3.Slerp(transform.forward, move, 15f * Time.deltaTime);
     }
 }
